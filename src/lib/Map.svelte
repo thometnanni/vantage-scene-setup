@@ -1,0 +1,101 @@
+<script>
+  import { onMount, createEventDispatcher } from "svelte";
+  import L from "leaflet";
+  import "leaflet/dist/leaflet.css";
+  import "leaflet-draw/dist/leaflet.draw.css";
+  import "leaflet-draw";
+
+  export let selectedLayer;
+  let mapContainer;
+  let map = null;
+  let currentLayer = null;
+
+  const dispatch = createEventDispatcher();
+
+  const setupLayer = (layer) => {
+    if (map) {
+      if (currentLayer) {
+        map.removeLayer(currentLayer);
+      }
+      if (layer) {
+        currentLayer = L.tileLayer(layer.value, {
+          attribution: layer.attribution,
+        });
+        currentLayer.addTo(map);
+      } else {
+        currentLayer = L.tileLayer(
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            attribution: "&copy; OpenStreetMap contributors",
+          },
+        );
+        currentLayer.addTo(map);
+      }
+    }
+  };
+
+  onMount(() => {
+    if (L.GeometryUtil) {
+      L.GeometryUtil.readableArea = function (area, isMetric) {
+        const units = isMetric ? ["m²", "ha", "km²"] : ["ft²", "ac", "mi²"];
+        const thresholds = isMetric ? [10000, 1000000] : [43560, 27878400];
+
+        let unitIndex = 0;
+        while (
+          area > thresholds[unitIndex] &&
+          unitIndex < thresholds.length - 1
+        ) {
+          area /= thresholds[unitIndex];
+          unitIndex++;
+        }
+
+        return `${area.toFixed(2)} ${units[unitIndex]}`;
+      };
+    }
+
+    map = L.map(mapContainer).setView([52.474, 13.43], 13);
+    setupLayer(selectedLayer);
+
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    const drawControl = new L.Control.Draw({
+      draw: {
+        polyline: false,
+        polygon: true,
+        rectangle: true,
+        circle: false,
+        marker: false,
+        circlemarker: false,
+      },
+      edit: {
+        featureGroup: drawnItems,
+      },
+    });
+    map.addControl(drawControl);
+
+    map.on(L.Draw.Event.CREATED, (event) => {
+      const { layer } = event;
+      drawnItems.addLayer(layer);
+      dispatch("shapeDrawn", {
+        layer,
+      });
+    });
+
+    map.on("zoomend", () => {
+      dispatch("mapZoomed", { zoom: map.getZoom() });
+    });
+  });
+
+  $: if (selectedLayer) {
+    setupLayer(selectedLayer);
+  }
+</script>
+
+<div bind:this={mapContainer} style="height: 600px; width: 100%;"></div>
+
+<style>
+  div {
+    width: 100%;
+  }
+</style>
