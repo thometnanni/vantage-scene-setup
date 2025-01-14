@@ -1,5 +1,6 @@
 <script>
   import { onMount, createEventDispatcher } from "svelte";
+  import { osmGeoJSON, clippedGeoJSON } from "./stores";
   import L from "leaflet";
   import "leaflet/dist/leaflet.css";
   import "leaflet-draw/dist/leaflet.draw.css";
@@ -9,6 +10,7 @@
   let mapContainer;
   let map = null;
   let currentLayer = null;
+  let geoJSONLayer = null;
 
   const dispatch = createEventDispatcher();
 
@@ -33,6 +35,32 @@
       }
     }
   };
+
+  const addGeoJSONToMap = (geoJSON) => {
+    if (geoJSONLayer) {
+      map.removeLayer(geoJSONLayer);
+    }
+    geoJSONLayer = L.geoJSON(geoJSON, {
+      style: {
+        color: "blue",
+        fillColor: "blue",
+        fillOpacity: 0.6,
+        weight: 2,
+      },
+    }).addTo(map);
+  };
+
+  $: osmGeoJSON.subscribe((geoJSON) => {
+    if (geoJSON && map) {
+      addGeoJSONToMap(geoJSON);
+    }
+  });
+
+  $: clippedGeoJSON.subscribe((geoJSON) => {
+    if (geoJSON && map) {
+      addGeoJSONToMap(geoJSON);
+    }
+  });
 
   onMount(() => {
     if (L.GeometryUtil) {
@@ -62,14 +90,36 @@
     const drawControl = new L.Control.Draw({
       draw: {
         polyline: false,
-        polygon: true,
-        rectangle: true,
+        polygon: {
+          shapeOptions: {
+            color: "var(--highlite)",
+            fillColor: "var(--highlite)",
+            fillOpacity: 0.2,
+            weight: 2,
+          },
+        },
+        rectangle: {
+          shapeOptions: {
+            color: "var(--highlite)",
+            fillColor: "var(--highlite)",
+            fillOpacity: 0.2,
+            weight: 2,
+          },
+        },
         circle: false,
         marker: false,
         circlemarker: false,
       },
       edit: {
         featureGroup: drawnItems,
+        edit: {
+          selectedPathOptions: {
+            color: "var(--stroke)",
+            fillColor: "var(--highlite)",
+            fillOpacity: 0.2,
+            weight: 2,
+          },
+        },
       },
     });
     map.addControl(drawControl);
@@ -77,6 +127,14 @@
     map.on(L.Draw.Event.CREATED, (event) => {
       const { layer } = event;
       drawnItems.clearLayers();
+
+      layer.setStyle({
+        color: "var(--stroke)",
+        fillColor: "var(--highlite)",
+        fillOpacity: 0.2,
+        weight: 2,
+      });
+
       drawnItems.addLayer(layer);
 
       dispatch("shapeDrawn", {

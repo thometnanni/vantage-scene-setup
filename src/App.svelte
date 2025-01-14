@@ -1,4 +1,5 @@
 <script>
+  import { clippedGeoJSON } from "./lib/stores";
   import Layers from "./lib/Layers.svelte";
   import Map from "./lib/Map.svelte";
   import Exporter from "./lib/Exporter.svelte";
@@ -20,6 +21,7 @@
   const handleShapeEdited = (event) => {
     area = event.detail.area;
     latlngs = event.detail.latlngs;
+    $clippedGeoJSON = latlngs
   };
 </script>
 

@@ -1,6 +1,8 @@
 <script>
     import JSZip from "jszip";
     import osmtogeojson from "osmtogeojson";
+    import { osmGeoJSON, clippedGeoJSON } from "./stores";
+    import * as turf from "@turf/turf";
 
     export let area;
     export let latlngs;
@@ -10,13 +12,8 @@
     let canDownload = false;
     let isProcessing = false;
 
-    console.log(area);
-    const checkArea = () => {
-        canDownload = area <= MAX_AREA;
-    };
-
     $: if (area) {
-        checkArea();
+        canDownload = area <= MAX_AREA;
     }
 
     const calculateBoundsFromLatLngs = (latlngs) => {
@@ -24,36 +21,220 @@
         return [latLngBounds.getSouthWest(), latLngBounds.getNorthEast()];
     };
 
-    const fetchGeoJSON = async () => {
-        if (!latlngs) return null;
-
-        const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
-        const overpassUrl = `https://overpass-api.de/api/interpreter`;
-        const query = `
-            [out:json];
-            (
-                way["building"](${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng});
-                relation["building"](${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng});
-            );
-            out body;
-            >;
-            out skel qt;
-        `;
-
-        const response = await fetch(overpassUrl, {
-            method: "POST",
-            body: query,
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        });
-
-        if (!response.ok) {
-            alert("Failed to fetch GeoJSON data.");
-            return null;
+    const getData = async () => {
+        if (!latlngs) {
+            alert("No area selected.");
+            return;
         }
 
-        const rawData = await response.json();
-        const geoJSON = osmtogeojson(rawData);
-        return geoJSON;
+        isProcessing = true;
+
+        try {
+            const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
+            const overpassUrl = `https://overpass-api.de/api/interpreter`;
+            const query = `
+                [out:json];
+                (
+                    way["building"](${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng});
+                    relation["building"](${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng});
+                );
+                out body;
+                >;
+                out skel qt;
+            `;
+
+            const response = await fetch(overpassUrl, {
+                method: "POST",
+                body: query,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            });
+
+            if (!response.ok) {
+                alert("Failed to fetch GeoJSON data.");
+                return;
+            }
+
+            const rawData = await response.json();
+            const geoJSON = osmtogeojson(rawData);
+
+            osmGeoJSON.set(geoJSON);
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            alert("An error occurred while fetching data.");
+        } finally {
+            isProcessing = false;
+        }
+    };
+
+    const clipData = () => {
+        let originalGeoJSON;
+        osmGeoJSON.subscribe((data) => {
+            originalGeoJSON = data;
+        })();
+
+        if (!originalGeoJSON || !latlngs) {
+            alert("No data to clip or no shape selected.");
+            return;
+        }
+
+        try {
+            const closedLatLngs = [...latlngs];
+            if (
+                latlngs.length > 0 &&
+                (latlngs[0].lat !== latlngs[latlngs.length - 1].lat ||
+                    latlngs[0].lng !== latlngs[latlngs.length - 1].lng)
+            ) {
+                closedLatLngs.push(latlngs[0]);
+            }
+
+            const clippingPolygon = turf.polygon([
+                closedLatLngs.map((point) => [point.lng, point.lat]),
+            ]);
+
+            const clippedFeatures = originalGeoJSON.features
+                .map((feature) => {
+                    const featureGeometry = feature.geometry;
+
+                    if (
+                        !featureGeometry ||
+                        !featureGeometry.coordinates ||
+                        (featureGeometry.type !== "Polygon" &&
+                            featureGeometry.type !== "MultiPolygon")
+                    ) {
+                        return null;
+                    }
+
+                    const featurePolygon = turf.geometry(
+                        featureGeometry.type,
+                        featureGeometry.coordinates,
+                    );
+
+                    const featureCollection = turf.featureCollection([
+                        turf.feature(featurePolygon),
+                        clippingPolygon,
+                    ]);
+
+                    try {
+                        const intersection = turf.intersect(featureCollection);
+
+                        if (intersection && intersection.geometry) {
+                            return {
+                                ...feature,
+                                geometry: intersection.geometry,
+                            };
+                        }
+                    } catch (err) {
+                        console.warn(
+                            "Error clipping feature:",
+                            feature,
+                            "Error:",
+                            err,
+                        );
+                    }
+
+                    return null;
+                })
+                .filter(Boolean);
+
+            if (clippedFeatures.length === 0) {
+                alert(
+                    "No features were clipped. Ensure your area intersects the data.",
+                );
+                return;
+            }
+
+            const clippedGeoJSONData = {
+                type: "FeatureCollection",
+                features: clippedFeatures,
+            };
+
+            clippedGeoJSON.set(clippedGeoJSONData);
+
+            const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
+            const bbox = [
+                southWest.lng,
+                southWest.lat,
+                northEast.lng,
+                northEast.lat,
+            ];
+        } catch (error) {
+            console.error("Error during clipping:", error);
+            alert(`Error during clipping: ${error.message}`);
+        }
+    };
+
+    const downloadData = async () => {
+        const geoJSON = $clippedGeoJSON;
+
+        if (!geoJSON) {
+            alert("No clipped data available. Clip data first.");
+            return;
+        }
+
+        isProcessing = true;
+
+        try {
+            const zip = new JSZip();
+
+            zip.file("buildings.geojson", JSON.stringify(geoJSON, null, 2));
+
+            const canvas = await fetchTilesAndRenderCanvas();
+            if (canvas) {
+                const blob = await new Promise((resolve) =>
+                    canvas.toBlob(resolve, "image/png"),
+                );
+                zip.file("map.png", blob);
+            }
+
+            const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
+            const bbox = [
+                southWest.lng,
+                southWest.lat,
+                northEast.lng,
+                northEast.lat,
+            ];
+
+            const config = {
+                bbox: bbox,
+                description: "Bounding box of the selected area",
+            };
+            zip.file("config.json", JSON.stringify(config, null, 2));
+
+            const closedLatLngs = [...latlngs];
+            if (
+                latlngs.length > 0 &&
+                (latlngs[0].lat !== latlngs[latlngs.length - 1].lat ||
+                    latlngs[0].lng !== latlngs[latlngs.length - 1].lng)
+            ) {
+                closedLatLngs.push(latlngs[0]);
+            }
+            const clippingPolygon = turf.polygon([
+                closedLatLngs.map((point) => [point.lng, point.lat]),
+            ]);
+            const clippingMaskGeoJSON = {
+                type: "FeatureCollection",
+                features: [turf.feature(clippingPolygon)],
+            };
+            zip.file(
+                "clipping-mask.geojson",
+                JSON.stringify(clippingMaskGeoJSON, null, 2),
+            );
+
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "vantage-scene-setup.zip";
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error during download:", error);
+            alert("An error occurred during download.");
+        } finally {
+            isProcessing = false;
+        }
     };
 
     const fetchTilesAndRenderCanvas = async () => {
@@ -157,45 +338,6 @@
 
         return canvas;
     };
-
-    const handleDownload = async () => {
-        if (!canDownload) {
-            alert("The area is too large or the zoom level is too low.");
-            return;
-        }
-
-        isProcessing = true;
-
-        try {
-            const zip = new JSZip();
-
-            const geoJSON = await fetchGeoJSON();
-            if (geoJSON) {
-                zip.file("buildings.geojson", JSON.stringify(geoJSON, null, 2));
-            }
-
-            const canvas = await fetchTilesAndRenderCanvas();
-            if (canvas) {
-                const blob = await new Promise((resolve) =>
-                    canvas.toBlob(resolve, "image/png"),
-                );
-                zip.file("map-tiles.png", blob);
-            }
-
-            const zipBlob = await zip.generateAsync({ type: "blob" });
-            const url = URL.createObjectURL(zipBlob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "vantage-scene-setup.zip";
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Error during download:", error);
-            alert("An error occurred during download.");
-        } finally {
-            isProcessing = false;
-        }
-    };
 </script>
 
 <div>
@@ -209,8 +351,17 @@
     {#if area && !canDownload && !isProcessing}
         <p>The selected area is too large. Please reduce the area.</p>
     {/if}
-    <button on:click={handleDownload} disabled={!canDownload || isProcessing}>
-        {isProcessing ? "Processing..." : "Download Data"}
+    <button on:click={getData} disabled={!canDownload || isProcessing}>
+        Fetch Data
+    </button>
+    <button
+        on:click={clipData}
+        disabled={!canDownload || isProcessing || !$osmGeoJSON}
+    >
+        Clip Data
+    </button>
+    <button on:click={downloadData} disabled={!canDownload || isProcessing}>
+        Download Data
     </button>
 </div>
 
