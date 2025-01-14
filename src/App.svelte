@@ -60,13 +60,13 @@
 
   @font-face {
     font-family: space;
-    src: url("SpaceGrotesk-Regular.woff2");
+    src: url("/SpaceGrotesk-Regular.woff2");
     font-weight: normal;
   }
 
   @font-face {
     font-family: space;
-    src: url("SpaceGrotesk-Medium.woff2");
+    src: url("/SpaceGrotesk-Medium.woff2");
     font-weight: bold;
   }
 </style>
