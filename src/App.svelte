@@ -21,16 +21,13 @@
   const handleShapeEdited = (event) => {
     area = event.detail.area;
     latlngs = event.detail.latlngs;
-    $clippedGeoJSON = latlngs
+    $clippedGeoJSON = latlngs;
   };
 </script>
 
 <div>
   <h1>Vantage Scene Setup</h1>
-  <p>
-    Export the relevant data to setup Vantage. Start by drawing a shape on the
-    map.
-  </p>
+  <p>Export the relevant data to setup Vantage.</p>
   <Layers bind:selectedLayer on:change={handleLayerChange} />
   <Map
     {selectedLayer}
