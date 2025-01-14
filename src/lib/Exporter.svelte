@@ -6,9 +6,11 @@
     export let latlngs;
     export let selectedLayer;
 
-    const MAX_AREA = 50000000;
+    const MAX_AREA = 8000000;
     let canDownload = false;
+    let isProcessing = false;
 
+    console.log(area);
     const checkArea = () => {
         canDownload = area <= MAX_AREA;
     };
@@ -101,13 +103,6 @@
         const tileCountX = bottomRightTileCoords.x - topLeftTileCoords.x + 1;
         const tileCountY = bottomRightTileCoords.y - topLeftTileCoords.y + 1;
 
-        console.log("Tile counts:", { tileCountX, tileCountY });
-
-        if (tileCountX <= 0 || tileCountY <= 0) {
-            console.error("Invalid tile counts:", { tileCountX, tileCountY });
-            return null;
-        }
-
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
 
@@ -169,39 +164,53 @@
             return;
         }
 
-        console.log("Handle Download");
+        isProcessing = true;
 
-        const zip = new JSZip();
+        try {
+            const zip = new JSZip();
 
-        const geoJSON = await fetchGeoJSON();
-        if (geoJSON) {
-            zip.file("buildings.geojson", JSON.stringify(geoJSON, null, 2));
+            const geoJSON = await fetchGeoJSON();
+            if (geoJSON) {
+                zip.file("buildings.geojson", JSON.stringify(geoJSON, null, 2));
+            }
+
+            const canvas = await fetchTilesAndRenderCanvas();
+            if (canvas) {
+                const blob = await new Promise((resolve) =>
+                    canvas.toBlob(resolve, "image/png"),
+                );
+                zip.file("map-tiles.png", blob);
+            }
+
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "vantage-scene-setup.zip";
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error during download:", error);
+            alert("An error occurred during download.");
+        } finally {
+            isProcessing = false;
         }
-
-        const canvas = await fetchTilesAndRenderCanvas();
-        if (canvas) {
-            const blob = await new Promise((resolve) =>
-                canvas.toBlob(resolve, "image/png"),
-            );
-            zip.file("map-tiles.png", blob);
-        }
-
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(zipBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "vantage-scene-setup.zip";
-        a.click();
-        URL.revokeObjectURL(url);
     };
 </script>
 
 <div>
-    {#if !canDownload}
+    {#if !area}
+        <p>Draw a shape on the map.</p>
+    {/if}
+
+    {#if isProcessing}
+        <p>Processing... Please wait.</p>
+    {/if}
+    {#if area && !canDownload && !isProcessing}
         <p>The selected area is too large. Please reduce the area.</p>
     {/if}
-    <button on:click={handleDownload} disabled={!canDownload}>
-        Download Data
+    <button on:click={handleDownload} disabled={!canDownload || isProcessing}>
+        {isProcessing ? "Processing..." : "Download Data"}
     </button>
 </div>
 

@@ -76,9 +76,24 @@
 
     map.on(L.Draw.Event.CREATED, (event) => {
       const { layer } = event;
+      drawnItems.clearLayers();
       drawnItems.addLayer(layer);
+
       dispatch("shapeDrawn", {
         layer,
+      });
+    });
+
+    map.on("draw:edited", (event) => {
+      const layers = event.layers;
+      layers.eachLayer((layer) => {
+        const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+        const latlngs = layer.getLatLngs()[0];
+        dispatch("shapeEdited", {
+          layer,
+          area,
+          latlngs,
+        });
       });
     });
 
