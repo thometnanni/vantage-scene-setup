@@ -180,10 +180,10 @@
 
             zip.file("buildings.geojson", JSON.stringify(geoJSON, null, 2));
 
-            const canvas = await fetchTilesAndRenderCanvas();
-            if (canvas) {
+            const clippedCanvas = await fetchTilesAndRenderCanvas();
+            if (clippedCanvas) {
                 const blob = await new Promise((resolve) =>
-                    canvas.toBlob(resolve, "image/png"),
+                    clippedCanvas.toBlob(resolve, "image/png"),
                 );
                 zip.file("map.png", blob);
             }
@@ -198,7 +198,6 @@
 
             const config = {
                 bbox: bbox,
-                description: "Bounding box of the selected area",
             };
             zip.file("config.json", JSON.stringify(config, null, 2));
 
@@ -336,7 +335,57 @@
             ctx.drawImage(img, dx, dy, tileSize, tileSize);
         });
 
-        return canvas;
+        //return canvas
+        // Clip it instead
+        const latLngToPixel = (lat, lng, zoom) => {
+            const scale = Math.pow(2, zoom) * tileSize;
+            const x = ((lng + 180) / 360) * scale;
+            const y =
+                ((1 -
+                    Math.log(
+                        Math.tan((lat * Math.PI) / 180) +
+                            1 / Math.cos((lat * Math.PI) / 180),
+                    ) /
+                        Math.PI) /
+                    2) *
+                scale;
+            return { x, y };
+        };
+
+        const topLeftPixel = latLngToPixel(
+            northEast.lat,
+            southWest.lng,
+            zoomLevel,
+        );
+        const bottomRightPixel = latLngToPixel(
+            southWest.lat,
+            northEast.lng,
+            zoomLevel,
+        );
+
+        const bboxX = topLeftPixel.x - topLeftTileCoords.x * tileSize;
+        const bboxY = topLeftPixel.y - topLeftTileCoords.y * tileSize;
+        const bboxWidth = bottomRightPixel.x - topLeftPixel.x;
+        const bboxHeight = bottomRightPixel.y - topLeftPixel.y;
+
+        const clippedCanvas = document.createElement("canvas");
+        clippedCanvas.width = bboxWidth;
+        clippedCanvas.height = bboxHeight;
+        const clippedCtx = clippedCanvas.getContext("2d");
+
+        clippedCtx.drawImage(
+            canvas,
+            bboxX,
+            bboxY,
+            bboxWidth,
+            bboxHeight,
+            0,
+            0,
+            bboxWidth,
+            bboxHeight,
+        );
+
+        return clippedCanvas;
     };
 </script>
 
