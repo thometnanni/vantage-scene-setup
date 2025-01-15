@@ -231,10 +231,28 @@
                 const mesh = new THREE.Mesh(buildingGeometry, material);
                 scene.add(mesh);
 
-                const convertedPoints = latlngs.map((latlng) => {
-                    const point = [latlng.lng, latlng.lat];
-                    return toMeters(point, referencePoint);
-                });
+                let convertedPoints;
+
+                if (latlngs.center && latlngs.radius) {
+                    const center = [latlngs.center.lng, latlngs.center.lat];
+                    const radiusInMeters = latlngs.radius;
+                    const circle = turf.circle(center, radiusInMeters / 1000, {
+                        steps: 64,
+                    });
+                    convertedPoints = circle.geometry.coordinates[0].map(
+                        (point) => {
+                            return toMeters(point, referencePoint);
+                        },
+                    );
+                } else if (Array.isArray(latlngs)) {
+                    convertedPoints = latlngs.map((latlng) => {
+                        const point = [latlng.lng, latlng.lat];
+                        return toMeters(point, referencePoint);
+                    });
+                } else {
+                    console.error("Invalid latlngs format");
+                    return;
+                }
 
                 const planeShape = new THREE.Shape(
                     convertedPoints.map(
