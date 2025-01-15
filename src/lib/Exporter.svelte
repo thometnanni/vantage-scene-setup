@@ -10,6 +10,8 @@
     export let area;
     export let latlngs;
     export let selectedLayer;
+    let clippingPolygon;
+    let southWest, northEast;
 
     const MAX_AREA = 8000000;
     let canDownload = false;
@@ -25,23 +27,38 @@
 
     const getData = async () => {
         if (!latlngs) {
-            alert("No area selected.");
+            return;
+        }
+
+        if (latlngs.center && latlngs.radius) {
+            const center = latlngs.center;
+            const radiusInDegrees = latlngs.radius / 111320; // degrees
+            southWest = {
+                lat: center.lat - radiusInDegrees,
+                lng: center.lng - radiusInDegrees,
+            };
+            northEast = {
+                lat: center.lat + radiusInDegrees,
+                lng: center.lng + radiusInDegrees,
+            };
+        } else if (Array.isArray(latlngs)) {
+            [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
+        } else {
             return;
         }
 
         try {
-            const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
             const overpassUrl = `https://overpass-api.de/api/interpreter`;
             const query = `
-                [out:json];
-                (
-                    way["building"](${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng});
-                    relation["building"](${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng});
-                );
-                out body;
-                >;
-                out skel qt;
-            `;
+            [out:json];
+            (
+                way["building"](${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng});
+                relation["building"](${southWest.lat},${southWest.lng},${northEast.lat},${northEast.lng});
+            );
+            out body;
+            >;
+            out skel qt;
+        `;
 
             const response = await fetch(overpassUrl, {
                 method: "POST",
@@ -52,7 +69,6 @@
             });
 
             if (!response.ok) {
-                alert("Failed to fetch GeoJSON data.");
                 return;
             }
 
@@ -62,7 +78,6 @@
             osmGeoJSON.set(geoJSON);
         } catch (error) {
             console.error("Error fetching data:", error);
-            alert("An error occurred while fetching data.");
         }
     };
 
@@ -73,23 +88,32 @@
         })();
 
         if (!originalGeoJSON || !latlngs) {
-            alert("No data to clip or no shape selected.");
             return;
         }
 
         try {
-            const closedLatLngs = [...latlngs];
-            if (
-                latlngs.length > 0 &&
-                (latlngs[0].lat !== latlngs[latlngs.length - 1].lat ||
-                    latlngs[0].lng !== latlngs[latlngs.length - 1].lng)
-            ) {
-                closedLatLngs.push(latlngs[0]);
-            }
+            if (latlngs.center && latlngs.radius) {
+                // console.log(latlngs);
+                const center = [latlngs.center.lng, latlngs.center.lat];
+                // console.log("cent", center);
+                const radius = latlngs.radius / 1000;
+                // console.log("radius", radius);
 
-            const clippingPolygon = turf.polygon([
-                closedLatLngs.map((point) => [point.lng, point.lat]),
-            ]);
+                clippingPolygon = turf.circle(center, radius, { steps: 64 });
+            } else {
+                const closedLatLngs = [...latlngs];
+                if (
+                    latlngs.length > 0 &&
+                    (latlngs[0].lat !== latlngs[latlngs.length - 1].lat ||
+                        latlngs[0].lng !== latlngs[latlngs.length - 1].lng)
+                ) {
+                    closedLatLngs.push(latlngs[0]);
+                }
+
+                clippingPolygon = turf.polygon([
+                    closedLatLngs.map((point) => [point.lng, point.lat]),
+                ]);
+            }
 
             const clippedFeatures = originalGeoJSON.features
                 .map((feature) => {
@@ -137,9 +161,6 @@
                 .filter(Boolean);
 
             if (clippedFeatures.length === 0) {
-                alert(
-                    "No features were clipped. Ensure your area intersects the data.",
-                );
                 return;
             }
 
@@ -149,17 +170,8 @@
             };
 
             clippedGeoJSON.set(clippedGeoJSONData);
-
-            const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
-            const bbox = [
-                southWest.lng,
-                southWest.lat,
-                northEast.lng,
-                northEast.lat,
-            ];
         } catch (error) {
             console.error("Error during clipping:", error);
-            alert(`Error during clipping: ${error.message}`);
         }
     };
 
@@ -167,7 +179,6 @@
         const geoJSON = $clippedGeoJSON;
 
         if (!geoJSON) {
-            alert("No clipped data available. Clip data first.");
             return;
         }
 
@@ -184,17 +195,12 @@
                 zip.file("map.png", blob);
             }
 
-            const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
-
             const bbox = [
                 southWest.lng,
                 southWest.lat,
                 northEast.lng,
                 northEast.lat,
             ];
-
-            const bboxPolygon = turf.bboxPolygon(bbox);
-            const centroid = turf.centroid(bboxPolygon).geometry.coordinates;
 
             const config = {
                 bbox: bbox,
@@ -266,7 +272,6 @@
                 zip.file("scene.gltf", gltfBlob);
             } catch (error) {
                 console.error("Error generating 3D model:", error);
-                alert("An error occurred while generating the 3D model.");
             }
 
             const zipBlob = await zip.generateAsync({ type: "blob" });
@@ -278,14 +283,12 @@
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error("Error during download:", error);
-            alert("An error occurred during download.");
         }
     };
 
     const fetchTilesAndRenderCanvas = async () => {
         if (!latlngs || !selectedLayer) return null;
 
-        const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
         const tileSize = 256;
         const zoomLevel = 17;
 

@@ -14,8 +14,17 @@
 
   const handleShapeDrawn = (event) => {
     const drawnLayer = event.detail.layer;
-    area = L.GeometryUtil.geodesicArea(drawnLayer._latlngs[0]);
-    latlngs = drawnLayer._latlngs[0];
+
+    if (drawnLayer instanceof L.Circle) {
+      const center = drawnLayer.getLatLng();
+      const radius = drawnLayer.getRadius();
+
+      area = Math.PI * Math.pow(radius, 2);
+      latlngs = { center, radius };
+    } else {
+      area = L.GeometryUtil.geodesicArea(drawnLayer._latlngs[0]);
+      latlngs = drawnLayer._latlngs[0];
+    }
   };
 
   const handleShapeEdited = (event) => {

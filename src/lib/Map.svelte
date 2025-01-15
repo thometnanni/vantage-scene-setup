@@ -106,7 +106,7 @@
             weight: 2,
           },
         },
-        circle: false,
+        circle: true,
         marker: false,
         circlemarker: false,
       },
