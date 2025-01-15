@@ -3,6 +3,9 @@
     import osmtogeojson from "osmtogeojson";
     import { osmGeoJSON, clippedGeoJSON } from "./stores";
     import * as turf from "@turf/turf";
+    import * as THREE from "three";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+    import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
     export let area;
     export let latlngs;
@@ -10,7 +13,6 @@
 
     const MAX_AREA = 8000000;
     let canDownload = false;
-    let isProcessing = false;
 
     $: if (area) {
         canDownload = area <= MAX_AREA;
@@ -26,8 +28,6 @@
             alert("No area selected.");
             return;
         }
-
-        isProcessing = true;
 
         try {
             const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
@@ -63,8 +63,6 @@
         } catch (error) {
             console.error("Error fetching data:", error);
             alert("An error occurred while fetching data.");
-        } finally {
-            isProcessing = false;
         }
     };
 
@@ -173,8 +171,6 @@
             return;
         }
 
-        isProcessing = true;
-
         try {
             const zip = new JSZip();
 
@@ -189,6 +185,7 @@
             }
 
             const [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
+
             const bbox = [
                 southWest.lng,
                 southWest.lat,
@@ -196,30 +193,81 @@
                 northEast.lat,
             ];
 
+            const bboxPolygon = turf.bboxPolygon(bbox);
+            const centroid = turf.centroid(bboxPolygon).geometry.coordinates;
+
             const config = {
                 bbox: bbox,
+                clipPath: latlngs,
+                referencePoint:
+                    turf.centroid($clippedGeoJSON).geometry.coordinates,
             };
+
+            const configString = JSON.stringify(config, null, 2);
+            navigator.clipboard.writeText(
+                `${turf.centroid($clippedGeoJSON).geometry.coordinates}`,
+            );
+
             zip.file("config.json", JSON.stringify(config, null, 2));
 
-            const closedLatLngs = [...latlngs];
-            if (
-                latlngs.length > 0 &&
-                (latlngs[0].lat !== latlngs[latlngs.length - 1].lat ||
-                    latlngs[0].lng !== latlngs[latlngs.length - 1].lng)
-            ) {
-                closedLatLngs.push(latlngs[0]);
+            try {
+                const referencePoint =
+                    turf.centroid(geoJSON).geometry.coordinates;
+                const buildingGeometry = generateBuildings(
+                    geoJSON,
+                    referencePoint,
+                );
+
+                const scene = new THREE.Scene();
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0x999999,
+                });
+                const mesh = new THREE.Mesh(buildingGeometry, material);
+                scene.add(mesh);
+
+                const convertedPoints = latlngs.map((latlng) => {
+                    const point = [latlng.lng, latlng.lat];
+                    return toMeters(point, referencePoint);
+                });
+
+                const planeShape = new THREE.Shape(
+                    convertedPoints.map(
+                        (coord) => new THREE.Vector2(coord.x, coord.y),
+                    ),
+                );
+
+                const planeGeometry = new THREE.ShapeGeometry(planeShape);
+                const planeMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xdddddd,
+                    side: THREE.DoubleSide,
+                });
+
+                const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+
+                plane.rotation.x = -Math.PI / 2;
+                plane.rotation.z = Math.PI;
+                plane.position.y = -0.01;
+
+                scene.add(plane);
+
+                const exporter = new GLTFExporter();
+                const gltfBlob = await new Promise((resolve, reject) => {
+                    exporter.parse(
+                        scene,
+                        (result) =>
+                            resolve(
+                                new Blob([JSON.stringify(result)], {
+                                    type: "application/json",
+                                }),
+                            ),
+                        reject,
+                    );
+                });
+                zip.file("scene.gltf", gltfBlob);
+            } catch (error) {
+                console.error("Error generating 3D model:", error);
+                alert("An error occurred while generating the 3D model.");
             }
-            const clippingPolygon = turf.polygon([
-                closedLatLngs.map((point) => [point.lng, point.lat]),
-            ]);
-            const clippingMaskGeoJSON = {
-                type: "FeatureCollection",
-                features: [turf.feature(clippingPolygon)],
-            };
-            zip.file(
-                "clipping-mask.geojson",
-                JSON.stringify(clippingMaskGeoJSON, null, 2),
-            );
 
             const zipBlob = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(zipBlob);
@@ -231,8 +279,6 @@
         } catch (error) {
             console.error("Error during download:", error);
             alert("An error occurred during download.");
-        } finally {
-            isProcessing = false;
         }
     };
 
@@ -336,7 +382,6 @@
         });
 
         //return canvas
-        // Clip it instead
         const latLngToPixel = (lat, lng, zoom) => {
             const scale = Math.pow(2, zoom) * tileSize;
             const x = ((lng + 180) / 360) * scale;
@@ -387,6 +432,105 @@
 
         return clippedCanvas;
     };
+
+    const generateBuildings = (geo, referencePoint) => {
+        const buildings = geo.features
+            .filter(({ properties }) => properties.building)
+            .flatMap((feature) => {
+                const coordinates = feature.geometry.coordinates;
+
+                if (!coordinates) return null;
+
+                if (feature.geometry.type === "Polygon") {
+                    return createBuildingGeometry(
+                        coordinates,
+                        referencePoint,
+                        feature.properties,
+                    );
+                } else if (feature.geometry.type === "MultiPolygon") {
+                    return coordinates.flatMap((polygon) =>
+                        createBuildingGeometry(
+                            polygon,
+                            referencePoint,
+                            feature.properties,
+                        ),
+                    );
+                } else {
+                    console.warn(
+                        "Unsupported geometry type:",
+                        feature.geometry.type,
+                    );
+                    return null;
+                }
+            })
+            .filter(Boolean);
+
+        return mergeGeometries(buildings);
+    };
+
+    const createBuildingGeometry = (
+        coordinates,
+        referencePoint,
+        properties,
+    ) => {
+        const shape = getShapeFromCoordinates(coordinates[0], referencePoint);
+        if (!shape) return null;
+
+        shape.holes = coordinates
+            .slice(1)
+            .map((hole) => getShapeFromCoordinates(hole, referencePoint));
+
+        const geometry = new THREE.ExtrudeGeometry(shape, {
+            curveSegments: 1,
+            depth: getBuildingHeight(properties),
+            bevelEnabled: false,
+        });
+
+        geometry.rotateX(Math.PI / 2);
+        geometry.rotateZ(Math.PI);
+        return geometry;
+    };
+
+    const getBuildingHeight = (properties) => {
+        return (
+            properties["building:height"] ??
+            properties["height"] ??
+            (properties["building:levels"]
+                ? properties["building:levels"] * 4
+                : 4)
+        );
+    };
+
+    const getShapeFromCoordinates = (coordinates, referencePoint) => {
+        try {
+            return new THREE.Shape(
+                coordinates.map((coord) => toMeters(coord, referencePoint)),
+            );
+        } catch (error) {
+            console.error(
+                "Error generating shape from coordinates:",
+                coordinates,
+                error,
+            );
+            return null;
+        }
+    };
+
+    const toMeters = (point, reference, flipX = true) => {
+        if (!Array.isArray(point) || point.length !== 2) {
+            throw new Error(
+                "Invalid coordinate format. Expected [longitude, latitude].",
+            );
+        }
+
+        const distance = turf.rhumbDistance(point, reference) * 1000;
+        const bearing = (turf.rhumbBearing(point, reference) * Math.PI) / 180;
+
+        const x = distance * Math.cos(bearing) * (flipX ? -1 : 1);
+        const y = distance * Math.sin(bearing);
+
+        return new THREE.Vector2(x, y);
+    };
 </script>
 
 <div>
@@ -394,22 +538,12 @@
         <p>Draw a shape on the map.</p>
     {/if}
 
-    {#if isProcessing}
-        <p>Processing... Please wait.</p>
-    {/if}
-    {#if area && !canDownload && !isProcessing}
+    {#if area && !canDownload}
         <p>The selected area is too large. Please reduce the area.</p>
     {/if}
-    <button on:click={getData} disabled={!canDownload || isProcessing}>
-        Fetch Data
-    </button>
-    <button
-        on:click={clipData}
-        disabled={!canDownload || isProcessing || !$osmGeoJSON}
-    >
-        Clip Data
-    </button>
-    <button on:click={downloadData} disabled={!canDownload || isProcessing}>
+    <button on:click={getData} disabled={!area}> Fetch Data </button>
+    <button on:click={clipData} disabled={!$osmGeoJSON}> Clip Data </button>
+    <button on:click={downloadData} disabled={!$clippedGeoJSON}>
         Download Data
     </button>
 </div>

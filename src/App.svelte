@@ -39,7 +39,6 @@
 
 <style>
   :global(html) {
-    background-color: var(--highlite);
     --highlite: lime;
     --stroke: black;
   }
@@ -50,7 +49,10 @@
     background-color: white;
     padding: 10px;
     margin: 0;
-    height: 100vh;
+  }
+
+  :global(::selection) {
+    background-color: var(--highlite);
   }
 
   :global(h1, p) {
