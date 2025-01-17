@@ -12,6 +12,9 @@
   let currentLayer = null;
   let geoJSONLayer = null;
 
+  let lat = 52.474;
+  let lng = 13.43;
+
   const dispatch = createEventDispatcher();
 
   const setupLayer = (layer) => {
@@ -29,7 +32,7 @@
           "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
           {
             attribution: "&copy; OpenStreetMap contributors",
-          },
+          }
         );
         currentLayer.addTo(map);
       }
@@ -81,7 +84,8 @@
       };
     }
 
-    map = L.map(mapContainer).setView([52.474, 13.43], 13);
+    // Initialize map with lat/lng from our variables
+    map = L.map(mapContainer).setView([lat, lng], 13);
     setupLayer(selectedLayer);
 
     const drawnItems = new L.FeatureGroup();
@@ -160,14 +164,30 @@
     });
   });
 
+  function moveMap() {
+    map.setView([lat, lng], 13);
+  }
+
   $: if (selectedLayer) {
     setupLayer(selectedLayer);
   }
 </script>
 
+<div class="controls">
+  <label>Latitude:</label>
+  <input type="number" bind:value={lat} step="0.0001" />
+  <label>Longitude:</label>
+  <input type="number" bind:value={lng} step="0.0001" />
+  <button on:click={moveMap}>Move Map</button>
+</div>
+
 <div bind:this={mapContainer} style="height: 600px; width: 100%;"></div>
 
 <style>
+  .controls {
+    margin-bottom: 1rem;
+  }
+
   div {
     width: 100%;
   }
