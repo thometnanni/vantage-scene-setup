@@ -257,7 +257,7 @@
                     ),
                 );
 
-                const planeSize = 10;
+                const planeSize = 2;
 
                 const extrudeSettings = {
                     depth: planeSize,
