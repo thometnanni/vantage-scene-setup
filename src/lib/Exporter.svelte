@@ -258,7 +258,7 @@
                 );
 
                 const planeSize = 10;
-                
+
                 const extrudeSettings = {
                     depth: planeSize,
                     bevelEnabled: false,
@@ -269,15 +269,15 @@
                     extrudeSettings,
                 );
 
+                planeGeometry.rotateX(Math.PI / 2);
+                planeGeometry.rotateZ(Math.PI);
+                // planeGeometry.translate(0, -planeSize, 0);
+
                 const planeMaterial = new THREE.MeshStandardMaterial({
                     color: 0xdddddd,
                     side: THREE.DoubleSide,
                 });
                 const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-
-                plane.rotation.x = -Math.PI / 2;
-                plane.rotation.z = Math.PI;
-                plane.position.y = -planeSize;
 
                 scene.add(plane);
 
