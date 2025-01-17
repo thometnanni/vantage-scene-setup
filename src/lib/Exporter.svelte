@@ -93,11 +93,8 @@
 
         try {
             if (latlngs.center && latlngs.radius) {
-                // console.log(latlngs);
                 const center = [latlngs.center.lng, latlngs.center.lat];
-                // console.log("cent", center);
                 const radius = latlngs.radius / 1000;
-                // console.log("radius", radius);
 
                 clippingPolygon = turf.circle(center, radius, { steps: 64 });
             } else {
@@ -260,17 +257,27 @@
                     ),
                 );
 
-                const planeGeometry = new THREE.ShapeGeometry(planeShape);
+                const planeSize = 10;
+                
+                const extrudeSettings = {
+                    depth: planeSize,
+                    bevelEnabled: false,
+                };
+
+                const planeGeometry = new THREE.ExtrudeGeometry(
+                    planeShape,
+                    extrudeSettings,
+                );
+
                 const planeMaterial = new THREE.MeshStandardMaterial({
                     color: 0xdddddd,
                     side: THREE.DoubleSide,
                 });
-
                 const plane = new THREE.Mesh(planeGeometry, planeMaterial);
 
                 plane.rotation.x = -Math.PI / 2;
                 plane.rotation.z = Math.PI;
-                plane.position.y = -0.01;
+                plane.position.y = -planeSize;
 
                 scene.add(plane);
 
