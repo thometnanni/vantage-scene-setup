@@ -271,7 +271,7 @@
 
                 planeGeometry.rotateX(Math.PI / 2);
                 planeGeometry.rotateZ(Math.PI);
-                // planeGeometry.translate(0, -planeSize, 0);
+                planeGeometry.translate(0, -planeSize, 0);
 
                 const planeMaterial = new THREE.MeshStandardMaterial({
                     color: 0xdddddd,
