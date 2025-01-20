@@ -32,19 +32,21 @@
 
         if (latlngs.center && latlngs.radius) {
             const center = latlngs.center;
-            const radiusInDegrees = latlngs.radius / 111320; // degrees
+
+            const radiusInLatitudeDegrees = latlngs.radius / 111320;
+
+            const radiusInLongitudeDegrees =
+                latlngs.radius /
+                (111320 * Math.cos((center.lat * Math.PI) / 180));
+
             southWest = {
-                lat: center.lat - radiusInDegrees,
-                lng: center.lng - radiusInDegrees,
+                lat: center.lat - radiusInLatitudeDegrees,
+                lng: center.lng - radiusInLongitudeDegrees,
             };
             northEast = {
-                lat: center.lat + radiusInDegrees,
-                lng: center.lng + radiusInDegrees,
+                lat: center.lat + radiusInLatitudeDegrees,
+                lng: center.lng + radiusInLongitudeDegrees,
             };
-        } else if (Array.isArray(latlngs)) {
-            [southWest, northEast] = calculateBoundsFromLatLngs(latlngs);
-        } else {
-            return;
         }
 
         try {
