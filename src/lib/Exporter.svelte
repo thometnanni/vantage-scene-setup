@@ -522,13 +522,16 @@
     };
 
     const getBuildingHeight = (properties) => {
-        return (
-            properties["building:height"] ??
-            properties["height"] ??
-            (properties["building:levels"]
-                ? properties["building:levels"] * 4
-                : 4)
-        );
+        let height =
+            properties["building:height"] ?? properties["height"] ?? "";
+        height = height.replace(/ m$/, "");
+        if (height !== "" && height != null && !isNaN(height)) {
+            return height;
+        }
+
+        return properties["building:levels"]
+            ? properties["building:levels"] * 4
+            : 4;
     };
 
     const getShapeFromCoordinates = (coordinates, referencePoint) => {
