@@ -20,7 +20,7 @@
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
-    "osmtogeojson": "^3.0.0-beta.5",
+    "osmtogeojson": "https://github.com/tyrasd/osmtogeojson#snyk-fix-65371a4c4920389f7e5127c141088511",
     "three": "^0.172.0"
   }
 }
