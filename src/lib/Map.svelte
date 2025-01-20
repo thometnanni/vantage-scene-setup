@@ -84,7 +84,6 @@
       };
     }
 
-    // Initialize map with lat/lng from our variables
     map = L.map(mapContainer).setView([lat, lng], 13);
     setupLayer(selectedLayer);
 
