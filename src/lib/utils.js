@@ -1,16 +1,17 @@
 import JSZip from 'jszip'
 import osmtogeojson from 'osmtogeojson'
 import * as turf from '@turf/turf'
+
 import * as THREE from 'three'
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 
-export function calculateBoundsFromLatLngs (latlngs) {
+export function calculateBoundsFromLatLngs(latlngs) {
   const latLngBounds = L.latLngBounds(latlngs)
   return [latLngBounds.getSouthWest(), latLngBounds.getNorthEast()]
 }
 
-export async function fetchData (
+export async function fetchData(
   latlngs,
   osmGeoJSONStore,
   setSouthWest,
@@ -89,7 +90,7 @@ export async function fetchData (
   }
 }
 
-export function clipData (latlngs, osmGeoJSONStore, clippedGeoJSONStore) {
+export function clipData(latlngs, osmGeoJSONStore, clippedGeoJSONStore) {
   let originalGeoJSON
   osmGeoJSONStore.subscribe(data => {
     originalGeoJSON = data
@@ -167,12 +168,13 @@ export function clipData (latlngs, osmGeoJSONStore, clippedGeoJSONStore) {
   }
 }
 
-export async function downloadData ({
+export async function downloadData({
   clippedGeoJSON,
   latlngs,
   southWest,
   northEast,
-  selectedLayer
+  selectedLayer,
+  referencePoint
 }) {
   if (!clippedGeoJSON) return
 
@@ -195,16 +197,17 @@ export async function downloadData ({
     }
 
     const bbox = [southWest.lng, southWest.lat, northEast.lng, northEast.lat]
+    // const centroid =  turf.centroid(clippedGeoJSON).geometry.coordinates
+
     const config = {
       bbox,
       clipPath: latlngs,
-      referencePoint: turf.centroid(clippedGeoJSON).geometry.coordinates
+      referencePoint
     }
 
     zip.file('config.json', JSON.stringify(config, null, 2))
 
     try {
-      const referencePoint = turf.centroid(clippedGeoJSON).geometry.coordinates
       const buildingGeometry = generateBuildings(clippedGeoJSON, referencePoint)
 
       const scene = new THREE.Scene()
@@ -244,7 +247,7 @@ export async function downloadData ({
   }
 }
 
-export async function fetchTilesAndRenderCanvas (
+export async function fetchTilesAndRenderCanvas(
   latlngs,
   southWest,
   northEast,
@@ -263,9 +266,9 @@ export async function fetchTilesAndRenderCanvas (
         Math.log(
           Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)
         ) /
-          Math.PI) /
+        Math.PI) /
         2) *
-        scale
+      scale
     )
     return { x, y }
   }
@@ -339,7 +342,7 @@ export async function fetchTilesAndRenderCanvas (
         Math.log(
           Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)
         ) /
-          Math.PI) /
+        Math.PI) /
         2) *
       scale
     return { x, y }
@@ -377,7 +380,7 @@ export async function fetchTilesAndRenderCanvas (
   return clippedCanvas
 }
 
-export function generateBuildings (geo, referencePoint) {
+export function generateBuildings(geo, referencePoint) {
   const buildings = geo.features
     .filter(({ properties }) => properties.building)
     .flatMap(feature => {
@@ -404,7 +407,7 @@ export function generateBuildings (geo, referencePoint) {
   return mergeGeometries(buildings)
 }
 
-function createBuildingGeometry (coordinates, referencePoint, properties) {
+function createBuildingGeometry(coordinates, referencePoint, properties) {
   const shape = getShapeFromCoordinates(coordinates[0], referencePoint)
   if (!shape) return null
 
@@ -424,7 +427,7 @@ function createBuildingGeometry (coordinates, referencePoint, properties) {
   return geometry
 }
 
-function getBuildingHeight (properties) {
+function getBuildingHeight(properties) {
   let height = properties['building:height'] ?? properties['height'] ?? ''
   height = height.replace(/ m$/, '')
   if (height !== '' && height != null && !isNaN(height)) {
@@ -433,7 +436,7 @@ function getBuildingHeight (properties) {
   return properties['building:levels'] ? properties['building:levels'] * 4 : 4
 }
 
-function getShapeFromCoordinates (coords, referencePoint) {
+function getShapeFromCoordinates(coords, referencePoint) {
   try {
     return new THREE.Shape(coords.map(coord => toMeters(coord, referencePoint)))
   } catch (error) {
@@ -442,7 +445,7 @@ function getShapeFromCoordinates (coords, referencePoint) {
   }
 }
 
-function toMeters (point, reference, flipX = true) {
+function toMeters(point, reference, flipX = true) {
   if (!Array.isArray(point) || point.length !== 2) {
     throw new Error(
       'Invalid coordinate format. Expected [longitude, latitude].'
@@ -456,7 +459,7 @@ function toMeters (point, reference, flipX = true) {
   return new THREE.Vector2(x, y)
 }
 
-function createClippingPlane (latlngs, referencePoint) {
+function createClippingPlane(latlngs, referencePoint) {
   if (!latlngs) return null
 
   let convertedPoints

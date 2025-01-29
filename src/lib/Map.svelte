@@ -1,6 +1,6 @@
 <script>
   import { onMount, createEventDispatcher } from "svelte";
-  import { osmGeoJSON, clippedGeoJSON } from "./stores";
+  import { osmGeoJSON, clippedGeoJSON, referencePoint } from "./stores";
   import L from "leaflet";
   import "leaflet/dist/leaflet.css";
   import "leaflet-draw/dist/leaflet.draw.css";
@@ -32,7 +32,7 @@
           "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
           {
             attribution: "&copy; OpenStreetMap contributors",
-          }
+          },
         );
         currentLayer.addTo(map);
       }
@@ -53,6 +53,27 @@
     }).addTo(map);
   };
 
+  const addReferenceToMap = (dot) => {
+    if (!map || !dot || dot.length < 2) return;
+
+    if (map.referenceMarker) {
+      map.removeLayer(map.referenceMarker);
+    }
+
+    const marker = L.circleMarker([dot[1], dot[0]], {
+      color: "red",
+      fillColor: "red",
+      fillOpacity: 1,
+      radius: 6,
+    });
+
+    map.referenceMarker = marker;
+
+    marker.addTo(map);
+
+    map.setView([dot[1], dot[0]], map.getZoom());
+  };
+
   $: osmGeoJSON.subscribe((geoJSON) => {
     if (geoJSON && map) {
       addGeoJSONToMap(geoJSON);
@@ -62,6 +83,12 @@
   $: clippedGeoJSON.subscribe((geoJSON) => {
     if (geoJSON && map) {
       addGeoJSONToMap(geoJSON);
+    }
+  });
+
+  $: referencePoint.subscribe((reference) => {
+    if (reference && map) {
+      addReferenceToMap(reference);
     }
   });
 

@@ -1,6 +1,7 @@
 <script>
-    import { osmGeoJSON, clippedGeoJSON } from "./stores";
+    import { osmGeoJSON, clippedGeoJSON, referencePoint } from "./stores";
     import { fetchData, clipData, downloadData } from "./utils.js";
+    import Reference from "./Reference.svelte";
 
     export let area;
     export let latlngs;
@@ -34,6 +35,7 @@
             southWest,
             northEast,
             selectedLayer,
+            referencePoint: $referencePoint,
         });
     }
 </script>
@@ -51,6 +53,8 @@
     <button on:click={download} disabled={!$clippedGeoJSON}
         >Download Data</button
     >
+    <hr />
+    <Reference />
 </div>
 
 <style>
