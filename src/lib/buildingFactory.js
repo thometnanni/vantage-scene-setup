@@ -180,37 +180,36 @@ function generateExtraParts(feature, referencePoint) {
     }
   }
 
-  if (
-    props["amenity"] === "place_of_worship" ||
-    props["building"] === "church" ||
-    props["building:part"] === "tower"
-  ) {
-    const towerHeight = normalizeLength(props["tower:height"] || "10");
-    const shape = getShapeFromCoordinates(
-      feature.geometry.coordinates[0],
-      referencePoint
-    );
-    if (shape) {
-      const points = shape.getPoints(20);
-      let centroid = new THREE.Vector2(0, 0);
-      points.forEach((p) => centroid.add(p));
-      centroid.divideScalar(points.length);
+  // if (
+  //   props["amenity"] === "place_of_worship" ||
+  //   props["building"] === "church" ||
+  //   props["building:part"] === "tower"
+  // ) {
+  //   const towerHeight = normalizeLength(props["tower:height"] || "10");
+  //   const shape = getShapeFromCoordinates(
+  //     feature.geometry.coordinates[0],
+  //     referencePoint
+  //   );
+  //   if (shape) {
+  //     const points = shape.getPoints(20);
+  //     let centroid = new THREE.Vector2(0, 0);
+  //     points.forEach((p) => centroid.add(p));
+  //     centroid.divideScalar(points.length);
 
-      const towerGeometry = new THREE.CylinderGeometry(1, 1, towerHeight, 16);
+  //     const towerGeometry = new THREE.CylinderGeometry(1, 1, towerHeight, 16);
 
-      towerGeometry.rotateX(-Math.PI / 2);
-      towerGeometry.rotateY(Math.PI);
+  //     // towerGeometry.rotateX(-Math.PI / 2);
+  //     towerGeometry.rotateY(Math.PI);
+  //     towerGeometry.translate(-centroid.x, towerHeight / 2, centroid.y);
 
-      towerGeometry.translate(-centroid.x, towerHeight / 2, centroid.y);
-
-      const towerMesh = new THREE.Mesh(
-        towerGeometry,
-        new THREE.MeshStandardMaterial({ color: 0x999999 })
-      );
-      towerMesh.name = "BuildingTower";
-      extraMeshes.push(towerMesh);
-    }
-  }
+  //     const towerMesh = new THREE.Mesh(
+  //       towerGeometry,
+  //       new THREE.MeshStandardMaterial({ color: 0x999999 })
+  //     );
+  //     towerMesh.name = "BuildingTower";
+  //     extraMeshes.push(towerMesh);
+  //   }
+  // }
 
   return extraMeshes;
 }
