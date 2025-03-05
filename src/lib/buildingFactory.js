@@ -85,57 +85,76 @@ function createWallGeometry(shape, wallHeight) {
 }
 
 function createRoofGeometry(shape, roofHeight, roofType = "flat") {
-  if (roofType === "flat") {
-    const extrudeSettings = {
-      depth: roofHeight,
-      bevelEnabled: false,
-      curveSegments: 1,
-    };
-    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    geometry.rotateX(-Math.PI / 2);
-    geometry.rotateZ(Math.PI);
-    return geometry;
-  } else if (roofType === "pyramidal") {
-    const points = shape.getPoints(20);
-    if (points.length < 3) {
-      console.warn("Not enough points for pyramidal roof");
-      return null;
+  let geometry;
+  switch (roofType.toLowerCase()) {
+    case "flat": {
+      const extrudeSettings = {
+        depth: roofHeight,
+        bevelEnabled: false,
+        curveSegments: 1,
+      };
+      geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      break;
     }
-    let centroid = new THREE.Vector2(0, 0);
-    points.forEach((p) => centroid.add(p));
-    centroid.divideScalar(points.length);
+    case "pyramidal": {
+      const points = shape.getPoints(20);
+      if (points.length < 3) {
+        console.warn("Not enough points for pyramidal roof");
+        const extrudeSettings = {
+          depth: roofHeight,
+          bevelEnabled: false,
+          curveSegments: 1,
+        };
+        geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      } else {
+        let centroid = new THREE.Vector2(0, 0);
+        points.forEach((p) => centroid.add(p));
+        centroid.divideScalar(points.length);
 
-    const vertices = [];
-    points.forEach((p) => vertices.push(new THREE.Vector3(p.x, p.y, 0)));
-    const apexIndex = vertices.length;
-    vertices.push(new THREE.Vector3(centroid.x, centroid.y, roofHeight));
+        const vertices = [];
+        points.forEach((p) => vertices.push(new THREE.Vector3(p.x, p.y, 0)));
+        const apexIndex = vertices.length;
+        vertices.push(new THREE.Vector3(centroid.x, centroid.y, roofHeight));
 
-    const indices = [];
-    for (let i = 0; i < points.length; i++) {
-      let next = (i + 1) % points.length;
-      indices.push(i, next, apexIndex);
+        const indices = [];
+        for (let i = 0; i < points.length; i++) {
+          let next = (i + 1) % points.length;
+          indices.push(i, next, apexIndex);
+        }
+
+        geometry = new THREE.BufferGeometry();
+        const positionArray = new Float32Array(vertices.length * 3);
+        vertices.forEach((v, i) => {
+          positionArray[i * 3] = v.x;
+          positionArray[i * 3 + 1] = v.y;
+          positionArray[i * 3 + 2] = v.z;
+        });
+        geometry.setAttribute(
+          "position",
+          new THREE.BufferAttribute(positionArray, 3)
+        );
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+      }
+      break;
     }
-
-    const geometry = new THREE.BufferGeometry();
-    const positionArray = new Float32Array(vertices.length * 3);
-    vertices.forEach((v, i) => {
-      positionArray[i * 3] = v.x;
-      positionArray[i * 3 + 1] = v.y;
-      positionArray[i * 3 + 2] = v.z;
-    });
-    geometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(positionArray, 3)
-    );
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    geometry.rotateX(-Math.PI / 2);
-    geometry.rotateZ(Math.PI);
-    return geometry;
-  } else {
-    console.warn("Roof type not supported:", roofType);
-    return null;
+    default: {
+      console.warn(
+        "Roof type not yet supported, falling back to flat:",
+        roofType
+      );
+      const extrudeSettings = {
+        depth: roofHeight,
+        bevelEnabled: false,
+        curveSegments: 1,
+      };
+      geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      break;
+    }
   }
+  geometry.rotateX(-Math.PI / 2);
+  geometry.rotateY(Math.PI);
+  return geometry;
 }
 
 function generateExtraParts(feature, referencePoint) {
@@ -192,7 +211,6 @@ function generateExtraParts(feature, referencePoint) {
 function generateEnhancedBuildingMesh(feature, referencePoint) {
   const props = feature.properties;
   if (!props.building && !props["building:part"]) return null;
-  console.log(props, props["building"]);
 
   const coordinates = feature.geometry.coordinates;
   let outerCoords, holes;
@@ -228,8 +246,6 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
   if (isNaN(roofHeight)) roofHeight = 0;
   const wallHeight =
     totalHeight > roofHeight ? totalHeight - roofHeight : totalHeight;
-
-  console.log(props);
 
   const wallGeometry = createWallGeometry(shape, wallHeight);
   const wallMesh = new THREE.Mesh(
@@ -295,9 +311,6 @@ function containsAnyPart(buildingFeature, partsList) {
     const partPolygon = turf.polygon([partCoords]);
 
     if (turf.booleanContains(buildingPolygon, partPolygon)) {
-      console.log(
-        `Ignoring building ${buildingFeature.id} because it contains a part ${partFeature.id}`
-      );
       return true;
     }
   }
@@ -331,7 +344,6 @@ export function generateEnhancedBuildings(geo, referencePoint) {
   buildingMeshes.forEach((mesh) => group.add(mesh));
   return group;
 }
-
 
 export function generateMergedBuildingsGeometry(geo, referencePoint) {
   const group = generateEnhancedBuildings(geo, referencePoint);
