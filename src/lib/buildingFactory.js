@@ -231,6 +231,48 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
     .map((holeCoords) => getShapeFromCoordinates(holeCoords, referencePoint))
     .filter(Boolean);
 
+  // spheres
+  if (
+    props["building:shape"] &&
+    props["building:shape"].toLowerCase() === "sphere"
+  ) {
+    const points = shape.getPoints();
+    let bbox = new THREE.Box2();
+    points.forEach((p) => bbox.expandByPoint(p));
+    const center = new THREE.Vector2();
+    bbox.getCenter(center);
+
+    const baseHeight = normalizeLength(props["min_height"] || "0");
+    let topHeight = normalizeLength(
+      props["building:height"] || props["height"] || ""
+    );
+    if (!topHeight || isNaN(topHeight) || topHeight === 0) {
+      topHeight = props["building:levels"]
+        ? parseFloat(props["building:levels"]) * 4
+        : 4;
+    }
+    const actualHeight = topHeight - baseHeight;
+    const sphereRadius = actualHeight / 2;
+
+    const size = bbox.getSize(new THREE.Vector2());
+    const footprintRadius = Math.max(size.x, size.y) / 2;
+    const finalRadius = Math.max(sphereRadius, footprintRadius);
+
+    const sphereGeometry = new THREE.SphereGeometry(finalRadius, 16, 16);
+
+    sphereGeometry.rotateX(-Math.PI / 2);
+    sphereGeometry.rotateY(Math.PI);
+
+    sphereGeometry.translate(-center.x, baseHeight + finalRadius, center.y);
+
+    const sphereMesh = new THREE.Mesh(
+      sphereGeometry,
+      new THREE.MeshStandardMaterial({ color: 0x999999 })
+    );
+    sphereMesh.name = "BuildingSphere";
+    return sphereMesh;
+  }
+
   const isPart = props["building:part"] ? true : false;
 
   const defaultHeight = isPart ? 2 : 4;
