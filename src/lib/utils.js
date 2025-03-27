@@ -4,7 +4,6 @@ import * as turf from "@turf/turf";
 
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { generateMergedBuildingsGeometry } from "./buildingFactory.js";
 
 export function calculateBoundsFromLatLngs(latlngs) {
@@ -392,72 +391,6 @@ export async function fetchTilesAndRenderCanvas(
   );
 
   return clippedCanvas;
-}
-
-export function generateBuildings(geo, referencePoint) {
-  const buildings = geo.features
-    .filter(({ properties }) => properties.building)
-    .flatMap((feature) => {
-      const coordinates = feature.geometry.coordinates;
-      if (!coordinates) return null;
-
-      if (feature.geometry.type === "Polygon") {
-        return createBuildingGeometry(
-          coordinates,
-          referencePoint,
-          feature.properties
-        );
-      } else if (feature.geometry.type === "MultiPolygon") {
-        return coordinates.flatMap((polygon) =>
-          createBuildingGeometry(polygon, referencePoint, feature.properties)
-        );
-      } else {
-        console.warn("Unsupported geometry type:", feature.geometry.type);
-        return null;
-      }
-    })
-    .filter(Boolean);
-
-  return mergeGeometries(buildings);
-}
-
-function createBuildingGeometry(coordinates, referencePoint, properties) {
-  const shape = getShapeFromCoordinates(coordinates[0], referencePoint);
-  if (!shape) return null;
-
-  shape.holes = coordinates
-    .slice(1)
-    .map((hole) => getShapeFromCoordinates(hole, referencePoint));
-
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    curveSegments: 1,
-    depth: getBuildingHeight(properties),
-    bevelEnabled: false,
-  });
-
-  geometry.rotateX(-Math.PI / 2);
-  geometry.rotateY(Math.PI / 2);
-  return geometry;
-}
-
-function getBuildingHeight(properties) {
-  let height = properties["building:height"] ?? properties["height"] ?? "";
-  height = height.replace(/ m$/, "");
-  if (height !== "" && height != null && !isNaN(height)) {
-    return height;
-  }
-  return properties["building:levels"] ? properties["building:levels"] * 4 : 4;
-}
-
-function getShapeFromCoordinates(coords, referencePoint) {
-  try {
-    return new THREE.Shape(
-      coords.map((coord) => toMeters(coord, referencePoint))
-    );
-  } catch (error) {
-    console.error("Error generating shape from coordinates:", coords, error);
-    return null;
-  }
 }
 
 function toMeters(point, reference, flipX = true) {
