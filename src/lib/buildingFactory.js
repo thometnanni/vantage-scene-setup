@@ -80,7 +80,7 @@ function createWallGeometry(shape, wallHeight) {
   };
   const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
   geometry.rotateX(-Math.PI / 2);
-  geometry.rotateY(Math.PI);
+  geometry.rotateY(Math.PI / 2);
   return geometry;
 }
 
