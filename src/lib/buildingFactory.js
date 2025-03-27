@@ -268,7 +268,7 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
     sphereGeometry.rotateX(-Math.PI / 2);
     sphereGeometry.rotateY(Math.PI / 2);
 
-    sphereGeometry.translate(-center.x, baseHeight + finalRadius, center.y);
+    sphereGeometry.translate(-center.y, baseHeight + finalRadius, -center.x);
 
     const sphereMesh = new THREE.Mesh(
       sphereGeometry,
