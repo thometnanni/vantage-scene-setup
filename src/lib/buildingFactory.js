@@ -251,10 +251,12 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
     let topHeight = normalizeLength(
       props["building:height"] || props["height"] || ""
     );
+
     if (!topHeight || isNaN(topHeight) || topHeight === 0) {
-      topHeight = props["building:levels"]
-        ? parseFloat(props["building:levels"]) * 4
-        : 4;
+      topHeight =
+        props["building:levels"] && !isNaN(parseFloat(props["building:levels"]))
+          ? parseFloat(props["building:levels"]) * 4
+          : 4;
     }
     const actualHeight = topHeight - baseHeight;
     const sphereRadius = actualHeight / 2;
@@ -285,9 +287,10 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
     props["building:height"] || props["height"] || ""
   );
   if (!totalHeight || isNaN(totalHeight) || totalHeight === 0) {
-    totalHeight = props["building:levels"]
-      ? parseFloat(props["building:levels"]) * (isPart ? 2 : 4)
-      : defaultHeight;
+    totalHeight =
+      props["building:levels"] && !isNaN(parseFloat(props["building:levels"]))
+        ? parseFloat(props["building:levels"]) * (isPart ? 2 : 4)
+        : defaultHeight;
   }
   let roofHeight = normalizeLength(props["roof:height"] || "");
   if (isNaN(roofHeight)) roofHeight = 0;
