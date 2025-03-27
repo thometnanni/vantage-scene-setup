@@ -434,10 +434,9 @@ function createBuildingGeometry(coordinates, referencePoint, properties) {
     depth: getBuildingHeight(properties),
     bevelEnabled: false,
   });
-  
-  geometry.rotateX(Math.PI / 2)
-  geometry.rotateZ(Math.PI)
 
+  geometry.rotateX(-Math.PI / 2);
+  geometry.rotateY(Math.PI / 2);
   return geometry;
 }
 
@@ -510,8 +509,8 @@ function createClippingPlane(latlngs, referencePoint) {
   };
 
   const planeGeometry = new THREE.ExtrudeGeometry(planeShape, extrudeSettings);
-  planeGeometry.rotateX(Math.PI / 2);
-  planeGeometry.rotateZ(Math.PI);
+  planeGeometry.rotateX(-Math.PI / 2);
+  planeGeometry.rotateY(Math.PI / 2);
   planeGeometry.translate(0, -planeSize, 0);
 
   const planeMaterial = new THREE.MeshStandardMaterial({
