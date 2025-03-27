@@ -153,7 +153,7 @@ function createRoofGeometry(shape, roofHeight, roofType = "flat") {
     }
   }
   geometry.rotateX(-Math.PI / 2);
-  geometry.rotateY(Math.PI);
+  geometry.rotateY(Math.PI / 2);
   return geometry;
 }
 
@@ -199,7 +199,7 @@ function generateExtraParts(feature, referencePoint) {
   //     const towerGeometry = new THREE.CylinderGeometry(1, 1, towerHeight, 16);
 
   //     // towerGeometry.rotateX(-Math.PI / 2);
-  //     towerGeometry.rotateY(Math.PI);
+  //     towerGeometry.rotateY(Math.PI / 2);
   //     towerGeometry.translate(-centroid.x, towerHeight / 2, centroid.y);
 
   //     const towerMesh = new THREE.Mesh(
@@ -266,7 +266,7 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
     const sphereGeometry = new THREE.SphereGeometry(finalRadius, 16, 16);
 
     sphereGeometry.rotateX(-Math.PI / 2);
-    sphereGeometry.rotateY(Math.PI);
+    sphereGeometry.rotateY(Math.PI / 2);
 
     sphereGeometry.translate(-center.x, baseHeight + finalRadius, center.y);
 
