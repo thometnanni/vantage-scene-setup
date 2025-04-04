@@ -1,12 +1,19 @@
 <script>
   import * as turf from "@turf/turf";
-  import { clippedGeoJSON, referencePoint, heightStore } from "./stores";
+  import {
+    clippedGeoJSON,
+    referencePoint,
+    heightStore,
+    fallbackHeightStore,
+  } from "./stores";
 
   let newReference = "";
   let height = 4;
+  let fallbackHeight = 1;
 
   $: {
     $heightStore = height;
+    $fallbackHeightStore = fallbackHeight;
     // console.log("Height:", $heightStore);
   }
 
@@ -45,6 +52,10 @@
   <button on:click={setNewReferencePoint}>Set</button>
 
   <hr />
-  <label>Default level height:</label>
-  <input type="number" bind:value={height} placeholder="height..." />
+  <label>Level height:</label>
+  <input type="number" bind:value={height} placeholder="level height..." />
+
+  <label>Fallback building height:</label>
+  <input type="number" bind:value={fallbackHeight} placeholder="Fallback building height..." />
+
 {/if}

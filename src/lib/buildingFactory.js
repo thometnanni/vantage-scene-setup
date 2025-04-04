@@ -2,7 +2,7 @@ import * as THREE from "three";
 import * as turf from "@turf/turf";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { get } from "svelte/store";
-import { heightStore } from "./stores";
+import { heightStore, fallbackHeightStore } from "./stores";
 
 function toMeters(point, reference, flipX = true) {
   if (!Array.isArray(point) || point.length < 2) {
@@ -286,7 +286,9 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
 
   const isPart = props["building:part"] ? true : false;
 
-  const fallbackHeight = isPart ? get(heightStore) / 2 : get(heightStore) / 2;
+  const fallbackHeight = isPart
+    ? get(fallbackHeightStore) / 2
+    : get(fallbackHeightStore) / 2;
   let totalHeight = normalizeLength(
     props["building:height"] || props["height"] || ""
   );
