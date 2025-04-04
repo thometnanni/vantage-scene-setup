@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import * as turf from "@turf/turf";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { get } from "svelte/store";
+import { heightStore } from "./stores";
 
 function toMeters(point, reference, flipX = true) {
   if (!Array.isArray(point) || point.length < 2) {
@@ -248,16 +250,18 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
     bbox.getCenter(center);
 
     const baseHeight = normalizeLength(props["min_height"] || "0");
+
     let topHeight = normalizeLength(
-      props["building:height"] || props["height"] || ""
+      props["building:height"] || props["height"] || get(heightStore) || "0"
     );
 
     if (!topHeight || isNaN(topHeight) || topHeight === 0) {
       topHeight =
         props["building:levels"] && !isNaN(parseFloat(props["building:levels"]))
-          ? parseFloat(props["building:levels"]) * 4
-          : 4;
+          ? parseFloat(props["building:levels"]) * get(heightStore)
+          : get(heightStore);
     }
+
     const actualHeight = topHeight - baseHeight;
     const sphereRadius = actualHeight / 2;
 
@@ -282,15 +286,17 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
 
   const isPart = props["building:part"] ? true : false;
 
-  const defaultHeight = isPart ? 2 : 4;
+  const fallbackHeight = isPart ? get(heightStore) / 2 : get(heightStore) / 2;
   let totalHeight = normalizeLength(
     props["building:height"] || props["height"] || ""
   );
+
   if (!totalHeight || isNaN(totalHeight) || totalHeight === 0) {
     totalHeight =
       props["building:levels"] && !isNaN(parseFloat(props["building:levels"]))
-        ? parseFloat(props["building:levels"]) * (isPart ? 2 : 4)
-        : defaultHeight;
+        ? parseFloat(props["building:levels"]) *
+          (isPart ? get(heightStore) / 2 : get(heightStore))
+        : fallbackHeight;
   }
   let roofHeight = normalizeLength(props["roof:height"] || "");
   if (isNaN(roofHeight)) roofHeight = 0;
