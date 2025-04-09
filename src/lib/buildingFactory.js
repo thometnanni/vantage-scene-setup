@@ -288,7 +288,7 @@ function generateEnhancedBuildingMesh(feature, referencePoint) {
 
   const fallbackHeight = isPart
     ? get(fallbackHeightStore) / 2
-    : get(fallbackHeightStore) / 2;
+    : get(fallbackHeightStore);
   let totalHeight = normalizeLength(
     props["building:height"] || props["height"] || ""
   );
